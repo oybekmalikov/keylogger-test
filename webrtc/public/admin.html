@@ -1,0 +1,508 @@
+<!-- <!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Viewer</title>
+  </head>
+  <body>
+    <h1>Admin — viewing live screen</h1>
+    <video id="remoteVideo" autoplay playsinline></video>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      const socket = io();
+      const peer = new RTCPeerConnection();
+      const video = document.getElementById("remoteVideo");
+
+      peer.ontrack = (e) => {
+        console.log("Track received!");
+        video.srcObject = e.streams[0];
+      };
+
+      peer.onicecandidate = (e) => {
+        if (e.candidate) socket.emit("candidate", e.candidate);
+      };
+
+      socket.on("offer", async (offer) => {
+        await peer.setRemoteDescription(offer);
+        const answer = await peer.createAnswer();
+        await peer.setLocalDescription(answer);
+        socket.emit("answer", answer);
+      });
+
+      socket.on("candidate", async (candidate) => {
+        await peer.addIceCandidate(candidate);
+      });
+    </script>
+  </body>
+</html> -->
+<!-- 
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <title>Viewer</title>
+</head>
+
+<body>
+  <h1>Admin — Viewing Screen + Webcam</h1>
+
+  <div style="display: flex; gap: 20px;">
+    <div>
+      <h3>Screen</h3>
+      <video id="screenVideo" autoplay playsinline width="400"></video>
+    </div>
+    <div>
+      <h3>Camera</h3>
+      <video id="camVideo" autoplay playsinline width="400"></video>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io()
+    const peer = new RTCPeerConnection()
+    const screenVideo = document.getElementById("screenVideo")
+    const camVideo = document.getElementById("camVideo")
+    let streamCount = 0
+    peer.ontrack = (event) => {
+      const stream = event.streams[0]
+      if (!screenVideo.srcObject) {
+        screenVideo.srcObject = stream
+      } else if (!camVideo.srcObject && stream.id !== screenVideo.srcObject.id) {
+        camVideo.srcObject = stream
+      }
+    }
+    peer.onicecandidate = (e) => {
+      if (e.candidate) socket.emit("candidate", e.candidate)
+    }
+    socket.on("offer", async (offer) => {
+      await peer.setRemoteDescription(offer)
+      const answer = await peer.createAnswer()
+      await peer.setLocalDescription(answer)
+      socket.emit("answer", answer)
+    })
+    socket.on("candidate", async (candidate) => {
+      await peer.addIceCandidate(candidate)
+    });
+  </script>
+</body>
+
+</html> -->
+<!-- 
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Viewer</title>
+  </head>
+  <body>
+    <h1>Admin — Viewing Screen + Webcam</h1>
+    <div style="display: flex; gap: 20px; margin-top: 20px;">
+      <div>
+        <h3>Screen</h3>
+        <video id="screenVideo" autoplay playsinline width="400"></video>
+      </div>
+      <div>
+        <h3>Camera</h3>
+        <video id="camVideo" autoplay playsinline width="400"></video>
+      </div>
+    </div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      const socket = io();
+      const peer = new RTCPeerConnection({
+        iceServers: [
+          { urls: "stun:stun.l.google.com:19302" },
+          {
+            urls: "turn:openrelay.metered.ca:80",
+            username: "openrelayproject",
+            credential: "openrelayproject",
+          },
+        ],
+      });
+      const screenVideo = document.getElementById("screenVideo");
+      const camVideo = document.getElementById("camVideo");
+      let streamCount = 0;
+      peer.ontrack = (e) => {
+        streamCount++;
+        if (streamCount === 1) screenVideo.srcObject = e.streams[0];
+        else if (streamCount === 2) camVideo.srcObject = e.streams[0];
+      };
+      peer.onicecandidate = (e) => {
+        if (e.candidate) socket.emit("candidate", e.candidate);
+      };
+      socket.on("offer", async (offer) => {
+        await peer.setRemoteDescription(offer);
+        const answer = await peer.createAnswer();
+        await peer.setLocalDescription(answer);
+        socket.emit("answer", answer);
+      });
+      socket.on("candidate", async (candidate) => {
+        await peer.addIceCandidate(candidate);
+      });
+    </script>
+  </body>
+</html> -->
+
+<!-- <!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Viewer</title>
+<style>
+  .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+  .online { background: #4CAF50; color: white; }
+  .offline { background: #f44336; color: white; }
+  .waiting { background: #FF9800; color: white; }
+</style>
+</head>
+<body>
+<h1>Admin — Viewing Screen + Webcam</h1>
+<div class="status" id="status">Connecting...</div>
+<button id="reconnectBtn" style="display: none;">Reconnect</button>
+<div style="display: flex; gap: 20px; margin-top: 20px;">
+  <div>
+    <h3>Screen</h3>
+    <video id="screenVideo" autoplay playsinline width="400"></video>
+  </div>
+  <div>
+    <h3>Camera</h3>
+    <video id="camVideo" autoplay playsinline width="400"></video>
+  </div>
+</div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+let peer = null;
+let agentId = null;
+const pendingCandidates = [];
+const screenVideo = document.getElementById("screenVideo");
+const camVideo = document.getElementById("camVideo");
+const statusDiv = document.getElementById("status");
+const reconnectBtn = document.getElementById("reconnectBtn");
+function updateStatus(message, state) {
+  statusDiv.textContent = message;
+  statusDiv.className = `status ${state}`;
+}
+socket.on("connect", () => {
+  console.log("Connected to server");
+  socket.emit("register-admin");
+  updateStatus("Connected - Waiting for agent...", "waiting");
+});
+socket.on("disconnect", () => {
+  updateStatus("Disconnected from server", "offline");
+  reconnectBtn.style.display = "block";
+  cleanupPeer();
+});
+socket.on("agent-online", () => {
+  updateStatus("Agent online - Waiting for stream...", "online");
+});
+socket.on("agent-offline", () => {
+  updateStatus("Agent offline", "offline");
+  cleanupPeer();
+});
+socket.on("offer", async (data) => {
+  console.log("Offer received from agent:", data.from);
+  agentId = data.from;
+  cleanupPeer();
+  peer = createPeerConnection();
+  try {
+    await peer.setRemoteDescription(data.offer);
+    for (const candidate of pendingCandidates) {
+      await peer.addIceCandidate(candidate);
+    }
+    pendingCandidates.length = 0;
+    const answer = await peer.createAnswer();
+    await peer.setLocalDescription(answer);
+    socket.emit("answer", { answer, to: agentId });
+    updateStatus("Connected to agent", "online");
+  } catch (err) {
+    console.error("Error handling offer:", err);
+    updateStatus("Connection error: " + err.message, "offline");
+  }
+});
+socket.on("candidate", async (data) => {
+  if (!data.candidate) return;
+  if (peer && peer.remoteDescription) {
+    try {
+      await peer.addIceCandidate(data.candidate);
+    } catch (err) {
+      console.error("Error adding ICE candidate:", err);
+    }
+  } else {
+    pendingCandidates.push(data.candidate);
+  }
+});
+function createPeerConnection() {
+  const newPeer = new RTCPeerConnection({
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun1.l.google.com:19302" },
+      {
+        urls: "turn:openrelay.metered.ca:80",
+        username: "openrelayproject",
+        credential: "openrelayproject",
+      },
+    ],
+    iceCandidatePoolSize: 10
+  });
+  let streamCount = 0;
+  newPeer.ontrack = (e) => {
+    console.log("Track received:", e.track.kind);
+    streamCount++;
+    
+    if (streamCount === 1) {
+      screenVideo.srcObject = e.streams[0];
+    } else if (streamCount === 2) {
+      camVideo.srcObject = e.streams[0];
+    }
+  };
+  newPeer.onicecandidate = (e) => {
+    if (e.candidate && agentId) {
+      socket.emit("candidate", {
+        candidate: e.candidate,
+        to: agentId
+      });
+    }
+  };
+  newPeer.onconnectionstatechange = () => {
+    console.log("Connection state:", newPeer.connectionState);
+    switch (newPeer.connectionState) {
+      case "connected":
+        updateStatus("Streaming active", "online");
+        reconnectBtn.style.display = "none";
+        break;
+      case "disconnected":
+        updateStatus("Connection lost - Reconnecting...", "waiting");
+        break;
+      case "failed":
+        updateStatus("Connection failed", "offline");
+        reconnectBtn.style.display = "block";
+        break;
+      case "closed":
+        updateStatus("Connection closed", "offline");
+        break;
+    }
+  };
+  newPeer.oniceconnectionstatechange = () => {
+    console.log("ICE connection state:", newPeer.iceConnectionState);
+  };
+  return newPeer;
+}
+function cleanupPeer() {
+  if (peer) {
+    peer.close();
+    peer = null;
+  }
+  screenVideo.srcObject = null;
+  camVideo.srcObject = null;
+  agentId = null;
+  pendingCandidates.length = 0;
+}
+reconnectBtn.addEventListener("click", () => {
+  socket.connect();
+  reconnectBtn.style.display = "none";
+  updateStatus("Reconnecting...", "waiting");
+});
+</script>
+</body>
+</html> -->
+
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Viewer</title>
+<style>
+  .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+  .online { background: #4CAF50; color: white; }
+  .offline { background: #f44336; color: white; }
+  .waiting { background: #FF9800; color: white; }
+</style>
+</head>
+<body>
+<h1>Admin — Viewing Screen + Webcam</h1>
+<div class="status" id="status">Connecting...</div>
+<button id="reconnectBtn" style="display: none;">Reconnect</button>
+<div style="display: flex; gap: 20px; margin-top: 20px;">
+  <div>
+    <h3>Screen</h3>
+    <video id="screenVideo" autoplay playsinline width="400"></video>
+  </div>
+  <div>
+    <h3>Camera</h3>
+    <video id="camVideo" autoplay playsinline width="400"></video>
+  </div>
+</div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+let peer = null;
+let agentId = null;
+const pendingCandidates = [];
+
+const screenVideo = document.getElementById("screenVideo");
+const camVideo = document.getElementById("camVideo");
+const statusDiv = document.getElementById("status");
+const reconnectBtn = document.getElementById("reconnectBtn");
+
+function updateStatus(message, state) {
+  statusDiv.textContent = message;
+  statusDiv.className = `status ${state}`;
+}
+
+// Register as admin when connected
+socket.on("connect", () => {
+  console.log("Connected to server");
+  socket.emit("register-admin");
+  updateStatus("Connected - Waiting for agent...", "waiting");
+});
+
+socket.on("disconnect", () => {
+  updateStatus("Disconnected from server", "offline");
+  reconnectBtn.style.display = "block";
+  cleanupPeer();
+});
+
+socket.on("agent-online", () => {
+  updateStatus("Agent online - Waiting for stream...", "online");
+});
+
+socket.on("agent-offline", () => {
+  updateStatus("Agent offline", "offline");
+  cleanupPeer();
+});
+
+// Handle offer from agent
+socket.on("offer", async (data) => {
+  console.log("Offer received from agent:", data.from);
+  agentId = data.from;
+  
+  // Cleanup old peer if exists
+  cleanupPeer();
+  
+  // Create new peer
+  peer = createPeerConnection();
+  
+  try {
+    await peer.setRemoteDescription(data.offer);
+    
+    // Add any pending candidates
+    for (const candidate of pendingCandidates) {
+      await peer.addIceCandidate(candidate);
+    }
+    pendingCandidates.length = 0;
+    
+    // Create and send answer
+    const answer = await peer.createAnswer();
+    await peer.setLocalDescription(answer);
+    socket.emit("answer", { answer, to: agentId });
+    
+    updateStatus("Connected to agent", "online");
+  } catch (err) {
+    console.error("Error handling offer:", err);
+    updateStatus("Connection error: " + err.message, "offline");
+  }
+});
+
+// Handle ICE candidates
+socket.on("candidate", async (data) => {
+  if (!data.candidate) return;
+  
+  if (peer && peer.remoteDescription) {
+    try {
+      await peer.addIceCandidate(data.candidate);
+    } catch (err) {
+      console.error("Error adding ICE candidate:", err);
+    }
+  } else {
+    // Store candidates if peer is not ready yet
+    pendingCandidates.push(data.candidate);
+  }
+});
+
+function createPeerConnection() {
+  const newPeer = new RTCPeerConnection({
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun1.l.google.com:19302" },
+      {
+        urls: "turn:openrelay.metered.ca:80",
+        username: "openrelayproject",
+        credential: "openrelayproject",
+      },
+    ],
+    iceCandidatePoolSize: 10
+  });
+
+  let streamCount = 0;
+
+  newPeer.ontrack = (e) => {
+    console.log("Track received:", e.track.kind);
+    streamCount++;
+    
+    if (streamCount === 1) {
+      screenVideo.srcObject = e.streams[0];
+    } else if (streamCount === 2) {
+      camVideo.srcObject = e.streams[0];
+    }
+  };
+
+  newPeer.onicecandidate = (e) => {
+    if (e.candidate && agentId) {
+      socket.emit("candidate", {
+        candidate: e.candidate,
+        to: agentId
+      });
+    }
+  };
+
+  newPeer.onconnectionstatechange = () => {
+    console.log("Connection state:", newPeer.connectionState);
+    
+    switch (newPeer.connectionState) {
+      case "connected":
+        updateStatus("Streaming active", "online");
+        reconnectBtn.style.display = "none";
+        break;
+      case "disconnected":
+        updateStatus("Connection lost - Reconnecting...", "waiting");
+        break;
+      case "failed":
+        updateStatus("Connection failed", "offline");
+        reconnectBtn.style.display = "block";
+        break;
+      case "closed":
+        updateStatus("Connection closed", "offline");
+        break;
+    }
+  };
+
+  newPeer.oniceconnectionstatechange = () => {
+    console.log("ICE connection state:", newPeer.iceConnectionState);
+  };
+
+  return newPeer;
+}
+
+function cleanupPeer() {
+  if (peer) {
+    peer.close();
+    peer = null;
+  }
+  screenVideo.srcObject = null;
+  camVideo.srcObject = null;
+  agentId = null;
+  pendingCandidates.length = 0;
+}
+
+reconnectBtn.addEventListener("click", () => {
+  socket.connect();
+  reconnectBtn.style.display = "none";
+  updateStatus("Reconnecting...", "waiting");
+});
+</script>
+</body>
+</html>
