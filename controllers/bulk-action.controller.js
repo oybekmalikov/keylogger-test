@@ -50,13 +50,32 @@ const bulkCreateDatas = async (req, res) => {
 	const type = req.query.type
 	console.log(type, modelType[type])
 	try {
-		await modelType[type].insertMany(req.body)
-		res.status(201).send({ message: 'SUCCESS', data: null, success: true })
+		if (type === 'screenshot') {
+			if (!req.file) {
+				return res.status(400).json({ error: 'Fayl topilmadi' })
+			}
+			const BASE_URL = process.env.API_HOST
+			const metadata = req.body || {}
+			const serverFilePath = BASE_URL + `/screenshots/${req.file.filename}`
+			const record = {
+				PCName: metadata.PCName,
+				ActiveWindowTitle: metadata.ActiveWindowTitle,
+				ActiveProcessName: metadata.ActiveProcessName,
+				FilePath: serverFilePath,
+			}
+			await screenshotsSchema.insertOne(record)
+			res.status(201).json({
+				message: 'Screeenshot created',
+				data: { createdData: record },
+				success: true,
+			})
+			return
+		} else {
+			await modelType[type].insertMany(req.body)
+			res.status(201).send({ message: 'SUCCESS', data: null, success: true })
+		}
 	} catch (error) {
 		errorHandler(error, res)
-		// res
-		// 	.status(400)
-		// 	.send({ message: 'Invalid model type!.', data: null, success: false })
 	}
 }
 const bulkGetConfigs = async (req, res) => {
@@ -75,6 +94,7 @@ const bulkGetConfigs = async (req, res) => {
 		errorHandler(error, res)
 	}
 }
+
 module.exports = {
 	bulkCreateDatas,
 	bulkGetDatas,

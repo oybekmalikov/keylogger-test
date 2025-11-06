@@ -69,8 +69,7 @@ async function start() {
 		await mongoose.connect(process.env.DB_URI)
 		const server = http.createServer(app)
 		// const server = https.createServer(mtlsOptions, app);
-
-		// rtcSocketInit(server)
+		rtcSocketInit(server)
 		server.listen(PORT, () => {
 			console.log(`Server running on http://localhost:${PORT}`)
 		})
