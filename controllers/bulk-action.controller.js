@@ -48,25 +48,26 @@ const bulkGetDatas = async (req, res) => {
 }
 const bulkCreateDatas = async (req, res) => {
 	const type = req.query.type
-	console.log(type, modelType[type])
+
 	try {
 		if (type === 'screenshot') {
 			if (!req.file) {
 				return res.status(400).json({ error: 'Fayl topilmadi' })
 			}
 			const BASE_URL = process.env.API_HOST
-			const metadata = req.body || {}
+			const metadata = JSON.parse(req.body.payload || '{}')
 			const serverFilePath = BASE_URL + `/screenshots/${req.file.filename}`
 			const record = {
 				PCName: metadata.PCName,
 				ActiveWindowTitle: metadata.ActiveWindowTitle,
 				ActiveProcessName: metadata.ActiveProcessName,
-				FilePath: serverFilePath,
+				FilePath: metadata.FilePath,
+				FilePathServer: serverFilePath,
 			}
 			await screenshotsSchema.insertOne(record)
 			res.status(201).json({
 				message: 'Screeenshot created',
-				data: { createdData: record },
+				data: null,
 				success: true,
 			})
 			return

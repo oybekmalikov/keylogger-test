@@ -20,7 +20,7 @@ const { registerAgent } = require('../controllers/auth.controller')
 router.post(
 	'/create',
 	// verifyAgentToken,
-	upload.single('screenshot'),
+	upload.single('image'),
 	bulkCreateDatas
 )
 router.get('/get', verifyAgentToken, bulkGetDatas)
